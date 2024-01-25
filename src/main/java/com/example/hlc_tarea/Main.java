@@ -1,91 +1,101 @@
 package com.example.hlc_tarea;
 
-import java.util.Scanner;
-import java.io.File;
+import java.sql.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.Scanner;
+import java.time.*;
 
 public class Main {
+    static Scanner sc = new Scanner(System.in);
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        double saldo = 1000.00;
+        String dni, consulta, nombre, apellidos, cuenta;
+        double saldo = 0, importe= 0, importe_total = 0;
+        LocalDateTime fecha;
+        Date dia;
+        Time hora;
+        Connection connection;
+        Statement st;
+        ResultSet rs;
+
+        System.setProperty("jdbc.drivers", "com.mysql.cj.jdbc.Driver");
+        String url = "jdbc:mysql://localhost:3306/cuentas_bancarias";
+        String user = "root";
+        String pass = "user";
         int opcion;
-        double cantidad;
-        String movimiento;
-        List<String> movimientos = new ArrayList<>();
+        try{
+            connection = DriverManager.getConnection(url ,user, pass);
+            System.out.println("Connection success.");
+            do {
+                System.out.println("\nCajero Automático");
+                System.out.println("1- Retirar fondos");
+                System.out.println("2- Ingresar fondos");
+                System.out.println("3- Consultar movimientos");
+                System.out.println("0- Salir");
+                System.out.print("Seleccione una opción: ");
+                opcion = scanner.nextInt();
 
-        try {
-            File file = new File("movimientos.txt");
-            if (file.exists()) {
-                movimientos = Files.readAllLines(Paths.get("movimientos.txt"));
-                for (String mov : movimientos) {
-                    System.out.println(mov);
+                switch (opcion) {
+                    case 1: // Retirar fondos
+                        System.out.println("Introduzca la cuenta: ");
+                        cuenta = scanner.next();
+                        System.out.print("Ingrese la cantidad a retirar: ");
+                        importe = scanner.nextDouble() * -1;
+                        fecha = LocalDateTime.now();
+                        consulta = "insert into movimientos values ("
+                                + "'" + cuenta + "'" + ", " + "'" + fecha + "'" + " , " + importe + ")";
+                        st = connection.createStatement();
+                        st.executeUpdate(consulta);
+                        break;
+                    case 2: // Ingresar fondos
+                        System.out.println("Introduzca la cuenta: ");
+                        cuenta = scanner.next();
+                        //cuenta = "12345678901234567890";
+                        System.out.print("Ingrese la cantidad a depositar: ");
+                        importe = scanner.nextDouble();
+                        fecha = LocalDateTime.now();
+                        consulta = "insert into movimientos values ("
+                                + cuenta + ", " + "'" + fecha + "'" + " , " + importe + ")";
+                        st = connection.createStatement();
+                        st.executeUpdate(consulta);
+
+                        break;
+                    case 3: // Consultar movimientos
+                        System.out.print("Introduzca el Número de Cuenta : ");
+                        cuenta = scanner.next();
+                        consulta = "select num_cuenta, fecha, importe from movimientos"
+                                + " where num_cuenta = ";
+                        consulta = consulta + "'" + cuenta + "'";
+                        st = connection.createStatement();
+                        rs=st.executeQuery(consulta);
+                        System.out.println("Cuenta Fecha Importe");
+                        System.out.println("-------------------- ------------------- ------------- ");
+                        while(rs.next())
+                        {
+                            cuenta = rs.getString("num_cuenta");
+                            dia = rs.getDate("fecha");
+                            hora = rs.getTime("fecha");
+                            importe = rs.getFloat("importe");
+                            System.out.println(cuenta + " " + dia + " " + hora + " " + importe);
+
+                        }
+
+                        break;
+                    case 0: // Salir
+                        System.out.println("Saliendo del sistema.");
+                        break;
+                    default:
+                        System.out.println("Opción no válida. Intente nuevamente.");
                 }
-            }
-        } catch (IOException e) {
-            System.out.println("Error al leer el archivo 'movimientos.txt'.");
+            } while (opcion != 0);
+
+            scanner.close();
+
+        } catch (SQLException sqle){
+            System.out.println(sqle.getMessage());
         }
-
-        do {
-            System.out.println("1- Retirar fondos");
-            System.out.println("2- Ingresar fondos");
-            System.out.println("3- Consulta de movimientos");
-            System.out.println("0- Salir");
-            System.out.print("Seleccione una opción: ");
-            opcion = scanner.nextInt();
-
-            switch (opcion) {
-                case 1:
-                    System.out.print("Ingrese la cantidad a retirar: ");
-                    cantidad = scanner.nextDouble();
-                    if (cantidad > saldo) {
-                        System.out.println("No hay suficiente saldo. Su saldo actual es de " + saldo + "€.");
-                    } else {
-                        saldo -= cantidad;
-                        System.out.println("Retiro exitoso. Su saldo actual es de " + saldo + "€.");
-                        movimiento = "Retiro de " + cantidad + "€. Saldo actual: " + saldo + "€.";
-                        movimientos.add(movimiento);
-                    }
-                    break;
-                case 2:
-                    System.out.print("Ingrese la cantidad a depositar: ");
-                    cantidad = scanner.nextDouble();
-                    saldo += cantidad;
-                    System.out.println("Depósito exitoso. Su saldo actual es de " + saldo + "€.");
-                    movimiento = "Depósito de " + cantidad + "€. Saldo actual: " + saldo + "€.";
-                    movimientos.add(movimiento);
-                    break;
-                case 3:
-                    System.out.println("Movimientos:");
-                    for (String mov : movimientos) {
-                        System.out.println(mov);
-                    }
-                    break;
-                case 0:
-                    System.out.println("Gracias por usar nuestro cajero automático.");
-                    break;
-                default:
-                    System.out.println("Opción no válida. Por favor, intente de nuevo.");
-                    break;
-            }
-
-            try {
-                FileWriter fileWriter = new FileWriter("movimientos.txt");
-                PrintWriter printWriter = new PrintWriter(fileWriter);
-                for (String mov : movimientos) {
-                    printWriter.println(mov);
-                }
-                printWriter.close();
-            } catch (IOException e) {
-                System.out.println("Error al escribir en el archivo 'movimientos.txt'.");
-            }
-        } while (opcion != 0);
-
-        scanner.close();
     }
 }
